@@ -1,0 +1,74 @@
+install:
+  helm: https://nexus-paas.mglu.io/repository/helm
+  artifact: magma-system
+  namespace: magma-system
+  helm-operator: https://github.com/k3s-io/helm-controller/releases/download/v0.16.10/deploy-cluster-scoped.yaml
+  template-helm: |
+    apiVersion: helm.cattle.io/v1
+    kind: HelmChart
+    metadata:
+      name: magma-system
+      namespace: kube-system
+    spec:
+      repo: https://nexus-paas.mglu.io/repository/helm
+      chart: magma-system
+      version: 0.12.0
+      targetNamespace: magma-system
+      createNamespace: true
+configuration:
+  domain:
+    question: Qual o dominio que deseja utilizar para acessar a plataforma?
+    parameters:
+      - 'kong.httproute.enabled=true'
+      - 'kong.httproute.hostname=magma-gateway.$domain'
+      - 'argocd.hostname=magma-agent.$domain'
+    environments:
+      - gateway_domain: magma-gateway.$domain
+  tls-secret:
+    question: Deseja instalar o certificado na plataforma?
+    active: Sim
+    options:
+      - Sim
+      - Não
+    input:
+      tls.crt: Informe o caminho do certificado
+      tls.key: Informe o caminho da chave privada
+    type: file
+    executor: kubernetes
+    kubernetes_component: secret_tls
+    parameters:
+      - 'traefik.tlsStore.default.defaultCertificate.secretName=tls-secret'
+wait-components: 
+  - deployment/magma-core
+  - deployment/magma-auth
+  - deployment/magma-console
+  - deployment/magma-ui
+  - deployment/magma-gateway
+  - deployment/magma-proxy
+  - statefulset/magma-database
+  - statefulset/magma-cache-primary
+  - statefulset/magma-broker
+load-balancer: magma-proxy
+post-install: |
+
+  A instalação da plataforma Magma foi concluída com sucesso em seu cluster.
+
+  Para que a ferramenta funcione corretamente, algumas configurações externas são necessárias:
+
+  **Configuração de DNS:**
+      * É crucial que você vincule o seguinte nome de domínio (DNS) ao endereço IP do servidor onde a ferramenta foi instalada:
+          * **Nome de Domínio (DNS) a ser configurado:** `{{ gateway_domain }}`
+          * **Endereço IP do Servidor:** `{{ load_balancer }}`
+
+      * Por favor, acesse o painel de controle do seu provedor de DNS e crie/atualize o registro A (ou CNAME, conforme sua necessidade) para apontar `{{ gateway_domain }}` para `{{ load_balancer }}`. A propagação dessa alteração de DNS pode levar algumas horas.
+
+  Após a conclusão dessas etapas, a plataforma estará pronto para uso.
+
+  Para primeiro uso você terá que realizar o login através do comando `magma auth login --platoform-url https://{{ gateway_domain }}`
+
+  Os dados padrão de acesso é:
+  Usuário: admin
+  Senha: admin
+
+  Se tiver alguma dúvida durante o processo de configuração, consulte nosso manual de instalação e uso que esta disponibilizado através do endereço https://magma-docs.mglu.io.
+
